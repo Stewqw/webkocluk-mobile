@@ -1,0 +1,49 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function userDoc(uid) {
+      return get(/databases/$(database)/documents/users/$(uid));
+    }
+
+    function userRole(uid) {
+      return userDoc(uid).data.role;
+    }
+
+    function isOwner(uid) {
+      return isSignedIn() && request.auth.uid == uid;
+    }
+
+    function isParent(uid) {
+      return isOwner(uid) && userRole(uid) == 'parent';
+    }
+
+    function isStudent(uid) {
+      return isOwner(uid) && userRole(uid) == 'student';
+    }
+
+    match /users/{uid} {
+      allow read, update, delete: if isOwner(uid);
+      allow create: if isOwner(uid);
+    }
+
+    // Student weekly teacher notes
+    // student_program_notes/{studentId}/days/{dayKey}
+    match /student_program_notes/{studentId}/days/{dayKey} {
+      // Student reads only own notes.
+      allow read: if isStudent(request.auth.uid) && request.auth.uid == studentId;
+
+      // Parent reads note if studentId exists in parent's linkedStudentIds.
+      allow read: if isParent(request.auth.uid)
+                  && studentId in userDoc(request.auth.uid).data.linkedStudentIds;
+
+      // Future teacher role write rule can be added here.
+      // Temporary: deny writes from mobile until teacher auth/role is added.
+      allow write: if false;
+    }
+  }
+}
