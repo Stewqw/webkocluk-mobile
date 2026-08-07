@@ -1,0 +1,40 @@
+{
+  "project_info": {
+    "project_number": "252912880544",
+    "firebase_url": "https://parabol-kocluk-default-rtdb.asia-southeast1.firebasedatabase.app",
+    "project_id": "parabol-kocluk",
+    "storage_bucket": "parabol-kocluk.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:252912880544:android:a152c3ca06ce1d5618b2c5",
+        "android_client_info": {
+          "package_name": "com.parabol.kocluk.webkocluk_mobile"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "252912880544-robj2kaiumthkm1k8ntqjmugkpfini2o.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBHwpHtcODCPpyyFi-vWDk97y6L5GfnLsA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "252912880544-robj2kaiumthkm1k8ntqjmugkpfini2o.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
