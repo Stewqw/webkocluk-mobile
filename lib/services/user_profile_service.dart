@@ -36,4 +36,30 @@ class UserProfileService {
       SetOptions(merge: true),
     );
   }
+
+  Future<void> addLinkedStudent({
+    required String parentUid,
+    required String studentUid,
+  }) {
+    return _doc(parentUid).set(
+      {
+        'linkedStudentIds': FieldValue.arrayUnion([studentUid]),
+        'updatedAt': FieldValue.serverTimestamp(),
+      },
+      SetOptions(merge: true),
+    );
+  }
+
+  Stream<List<AppUserProfile>> watchProfilesByIds(List<String> ids) {
+    if (ids.isEmpty) return Stream.value(const []);
+
+    final limitedIds = ids.take(10).toList();
+    return _firestore
+        .collection('users')
+        .where('uid', whereIn: limitedIds)
+        .snapshots()
+        .map((snap) => snap.docs
+            .map((doc) => AppUserProfile.fromMap(doc.data()))
+            .toList());
+  }
 }

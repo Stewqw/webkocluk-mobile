@@ -19,6 +19,12 @@
   - `note: string`
   - `updatedAt: timestamp`
 
+- `student_link_codes/{code}`
+  - `studentId: string`
+  - `active: bool`
+  - `createdAt: timestamp`
+  - `expiresAt: timestamp`
+
 ## Current Mobile Flows
 1. Firebase initialize
 2. Auth state gate
@@ -26,13 +32,14 @@
 4. New user profile setup (`users` doc)
 5. Role-based home screen
 6. Student note read flow for selected day
+7. Student link-code generation (7-day validity)
+8. Parent code claim and linked-student note view
 
 ## Next Milestones
-1. Parent-to-student linking screen and invite flow
-2. Weekly program read model (`weekly_programs` collection)
-3. Teacher role and write permissions for notes/tasks
-4. Push notifications (FCM)
-5. Offline cache strategy
+1. Weekly program read model (`weekly_programs` collection)
+2. Teacher role and write permissions for notes/tasks
+3. Push notifications (FCM)
+4. Offline cache strategy
 
 ## Important
 - Generate real Firebase options with `flutterfire configure`.

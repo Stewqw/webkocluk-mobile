@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'firebase_options.dart';
 import 'models/app_user.dart';
 import 'services/auth_service.dart';
+import 'services/link_code_service.dart';
 import 'services/teacher_note_service.dart';
 import 'services/user_profile_service.dart';
 
@@ -382,24 +383,147 @@ class RoleHomePage extends StatelessWidget {
   }
 }
 
-class ParentHome extends StatelessWidget {
+class ParentHome extends StatefulWidget {
   const ParentHome({super.key, required this.profile});
 
   final AppUserProfile profile;
 
   @override
+  State<ParentHome> createState() => _ParentHomeState();
+}
+
+class _ParentHomeState extends State<ParentHome> {
+  final _codeController = TextEditingController();
+  final _linkCodeService = LinkCodeService();
+  final _profileService = UserProfileService();
+  final _noteService = TeacherNoteService();
+  static const _weekDays = ['pzt', 'sal', 'car', 'per', 'cum', 'cmt', 'paz'];
+
+  bool _loading = false;
+  String _message = 'Kod ile ogrenci baglayabilirsiniz.';
+  String? _selectedStudentId;
+  String _selectedDay = 'pzt';
+
+  Future<void> _claimCode() async {
+    setState(() {
+      _loading = true;
+      _message = 'Kod kontrol ediliyor...';
+    });
+
+    try {
+      final studentId = await _linkCodeService.claimCode(
+        parentUid: widget.profile.uid,
+        rawCode: _codeController.text,
+      );
+      _codeController.clear();
+      setState(() {
+        _message = 'Ogrenci baglandi: $studentId';
+        _selectedStudentId ??= studentId;
+      });
+    } catch (e) {
+      setState(() => _message = 'Baglama hatasi: $e');
+    } finally {
+      setState(() => _loading = false);
+    }
+  }
+
+  @override
+  void dispose() {
+    _codeController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final linkedIds = widget.profile.linkedStudentIds;
+    if (_selectedStudentId == null && linkedIds.isNotEmpty) {
+      _selectedStudentId = linkedIds.first;
+    }
+
     return Padding(
       padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: ListView(
         children: [
-          Text(
-            'Veli paneli altyapisi hazir. Sonraki adimda ogrenci baglama ve program ekranlari eklenecek.',
-            style: Theme.of(context).textTheme.bodyLarge,
+          TextField(
+            controller: _codeController,
+            textCapitalization: TextCapitalization.characters,
+            decoration: const InputDecoration(
+              labelText: 'Ogrenci baglama kodu',
+              hintText: 'Orn: A7KD2Q',
+            ),
           ),
-          const SizedBox(height: 12),
-          Text('Bagli ogrenci sayisi: ${profile.linkedStudentIds.length}'),
+          const SizedBox(height: 10),
+          ElevatedButton(
+            onPressed: _loading ? null : _claimCode,
+            child: const Text('Kodu Kullan ve Ogrenci Bagla'),
+          ),
+          const SizedBox(height: 8),
+          Text('Durum: $_message'),
+          const SizedBox(height: 16),
+          Text('Bagli ogrenci sayisi: ${linkedIds.length}'),
+          const SizedBox(height: 8),
+          if (linkedIds.isNotEmpty)
+            DropdownButtonFormField<String>(
+              initialValue: _selectedStudentId,
+              decoration: const InputDecoration(labelText: 'Ogrenci secin'),
+              items: linkedIds
+                  .map((id) => DropdownMenuItem(value: id, child: Text(id)))
+                  .toList(),
+              onChanged: (value) {
+                if (value == null) return;
+                setState(() => _selectedStudentId = value);
+              },
+            ),
+          const SizedBox(height: 8),
+          if (_selectedStudentId != null)
+            DropdownButtonFormField<String>(
+              initialValue: _selectedDay,
+              decoration: const InputDecoration(labelText: 'Gun secin'),
+              items: _weekDays
+                  .map((d) => DropdownMenuItem(value: d, child: Text(d.toUpperCase())))
+                  .toList(),
+              onChanged: (value) {
+                if (value == null) return;
+                setState(() => _selectedDay = value);
+              },
+            ),
+          const SizedBox(height: 10),
+          if (_selectedStudentId != null)
+            StreamBuilder<String>(
+              stream: _noteService.watchTeacherNote(
+                studentId: _selectedStudentId!,
+                dayKey: _selectedDay,
+              ),
+              builder: (context, snapshot) {
+                final note = (snapshot.data ?? '').trim();
+                return Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: Text(
+                      note.isEmpty
+                          ? 'Bu gun icin ogretmen notu yok.'
+                          : 'Ogretmen Notu: $note',
+                    ),
+                  ),
+                );
+              },
+            ),
+          const SizedBox(height: 10),
+          StreamBuilder<List<AppUserProfile>>(
+            stream: _profileService.watchProfilesByIds(linkedIds),
+            builder: (context, snapshot) {
+              final students = snapshot.data ?? const <AppUserProfile>[];
+              if (students.isEmpty) {
+                return const Text('Henuz bagli ogrenci bulunmuyor.');
+              }
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: students
+                    .map((s) => Text('- ${s.displayName.isEmpty ? s.email : s.displayName}'))
+                    .toList(),
+              );
+            },
+          ),
         ],
       ),
     );
@@ -417,8 +541,27 @@ class StudentHome extends StatefulWidget {
 
 class _StudentHomeState extends State<StudentHome> {
   final TeacherNoteService _noteService = TeacherNoteService();
+  final LinkCodeService _linkCodeService = LinkCodeService();
   static const _weekDays = ['pzt', 'sal', 'car', 'per', 'cum', 'cmt', 'paz'];
   String _dayKey = 'pzt';
+  bool _creatingCode = false;
+  String _codeMessage = '';
+
+  Future<void> _createCode() async {
+    setState(() {
+      _creatingCode = true;
+      _codeMessage = 'Baglanti kodu uretiliyor...';
+    });
+
+    try {
+      final code = await _linkCodeService.createOrRotateCode(widget.profile.uid);
+      setState(() => _codeMessage = 'Yeni kod: $code');
+    } catch (e) {
+      setState(() => _codeMessage = 'Kod hatasi: $e');
+    } finally {
+      setState(() => _creatingCode = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -429,6 +572,38 @@ class _StudentHomeState extends State<StudentHome> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text('Ogrenci paneli'),
+          const SizedBox(height: 10),
+          StreamBuilder<String>(
+            stream: _linkCodeService.watchActiveCode(studentId),
+            builder: (context, snapshot) {
+              final code = (snapshot.data ?? '').trim();
+              return Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('Veli baglama kodu (7 gun gecerli):'),
+                      const SizedBox(height: 6),
+                      SelectableText(
+                        code.isEmpty ? 'Kod henuz olusturulmadi.' : code,
+                        style: Theme.of(context).textTheme.titleMedium,
+                      ),
+                      const SizedBox(height: 8),
+                      ElevatedButton(
+                        onPressed: _creatingCode ? null : _createCode,
+                        child: const Text('Yeni Baglama Kodu Uret'),
+                      ),
+                      if (_codeMessage.isNotEmpty) ...[
+                        const SizedBox(height: 6),
+                        Text(_codeMessage),
+                      ],
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
           const SizedBox(height: 10),
           DropdownButton<String>(
             value: _dayKey,

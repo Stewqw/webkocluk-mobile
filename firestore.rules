@@ -26,9 +26,32 @@ service cloud.firestore {
       return isOwner(uid) && userRole(uid) == 'student';
     }
 
+    function isLinkedStudentForParent(studentUid) {
+      return isParent(request.auth.uid)
+             && studentUid in userDoc(request.auth.uid).data.linkedStudentIds;
+    }
+
+    function isOwnStudentCodeData(data) {
+      return isSignedIn() && data.studentId == request.auth.uid;
+    }
+
     match /users/{uid} {
-      allow read, update, delete: if isOwner(uid);
+      allow read: if isOwner(uid) || isLinkedStudentForParent(uid);
+      allow update, delete: if isOwner(uid);
       allow create: if isOwner(uid);
+    }
+
+    // Student-parent link codes
+    // student_link_codes/{code}
+    match /student_link_codes/{code} {
+      // Signed-in users can read a specific code document to perform linking.
+      allow read: if isSignedIn();
+
+      // Only student owner can create/update/deactivate their own codes.
+      allow create: if isOwnStudentCodeData(request.resource.data);
+      allow update: if isOwnStudentCodeData(resource.data)
+                    && isOwnStudentCodeData(request.resource.data);
+      allow delete: if isOwnStudentCodeData(resource.data);
     }
 
     // Student weekly teacher notes

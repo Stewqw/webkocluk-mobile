@@ -9,6 +9,8 @@ Flutter mobile foundation for Web Kocluk app.
 - User profile creation in Firestore (`student` / `parent` role)
 - Role-based home routing
 - Student teacher-note read flow by day
+- Student-parent linking by one-time code
+- Parent linked-student note view
 
 ## Setup
 
